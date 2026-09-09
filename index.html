@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>박스 크기 비교</title>
+<style>
+:root{
+  --bg:#f4f4f1; --panel:#fff; --ink:#1b1b19; --muted:#8b8b85; --line:#e4e4de;
+  --accent:#2b6cff; --grid:#d6d6ce; --sub:#fafaf8;
+  --shadow:rgba(0,0,0,.22);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#131418; --panel:#1b1d22; --ink:#e9e9e6; --muted:#868b95; --line:#2b2e35;
+    --accent:#6d9bff; --grid:#2f333b; --sub:#16181c;
+    --shadow:rgba(0,0,0,.55);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;overflow:hidden;background:var(--bg);color:var(--ink);
+  font:13px/1.5 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+#app{display:grid;grid-template-columns:288px 1fr;height:100vh}
+
+/* ---------- panel ---------- */
+#panel{
+  background:var(--panel);border-right:1px solid var(--line);
+  overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;
+}
+.brand{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:14px;font-weight:650;letter-spacing:-.01em}
+.brand p{margin:3px 0 0;font-size:11px;color:var(--muted)}
+.sec{padding:14px 14px 4px}
+.sec+.sec{border-top:1px solid var(--line)}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sec-h b{font-size:11px;font-weight:650;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+
+.card{border:1px solid var(--line);border-radius:9px;padding:8px;margin-bottom:7px;background:var(--sub)}
+.card.off{opacity:.42}
+.card-t{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.sw{width:15px;height:15px;border-radius:4px;border:none;padding:0;flex:none;position:relative;overflow:hidden}
+.sw input{position:absolute;inset:-6px;opacity:0;cursor:pointer;width:200%;height:200%}
+.nm{flex:1;min-width:0;border:none;background:transparent;padding:2px 3px;border-radius:4px;font-weight:550;font-size:12.5px}
+.nm:hover{background:var(--panel)}
+.nm:focus{outline:1px solid var(--accent);background:var(--panel)}
+.ico{border:none;background:transparent;color:var(--muted);padding:2px 4px;border-radius:5px;line-height:1;font-size:12px;flex:none}
+.ico:hover{background:var(--line);color:var(--ink)}
+.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.dim{display:flex;flex-direction:column;gap:2px}
+.dim span{font-size:9.5px;color:var(--muted);letter-spacing:.03em;padding-left:1px}
+.dim input{
+  width:100%;border:1px solid var(--line);background:var(--panel);border-radius:6px;
+  padding:4px 5px;font-size:12px;font-variant-numeric:tabular-nums;-moz-appearance:textfield;
+}
+.dim input::-webkit-outer-spin-button,.dim input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.dim input:focus{outline:none;border-color:var(--accent)}
+.rot{display:flex;gap:4px;margin-top:6px}
+.rotb{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:6px;padding:4px 2px;font-size:10px;letter-spacing:-.01em}
+.rotb:hover{border-color:var(--accent);color:var(--accent)}
+
+.btn{
+  width:100%;border:1px dashed var(--line);background:transparent;color:var(--muted);
+  border-radius:8px;padding:7px;font-size:12px;margin-bottom:7px;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent);border-style:solid}
+select.btn{border-style:solid;text-align:left;appearance:none;
+  background:var(--sub) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238b8b85'/></svg>") no-repeat right 9px center}
+.empty{color:var(--muted);font-size:11.5px;padding:2px 2px 8px}
+
+/* ---------- stage ---------- */
+main{display:grid;grid-template-rows:1fr auto;min-width:0;min-height:0}
+#stage{
+  position:relative;overflow:hidden;min-height:0;
+  perspective:2600px;cursor:grab;touch-action:none;
+  background:radial-gradient(ellipse 80% 70% at 50% 42%,var(--panel),var(--bg) 78%);
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+}
+#stage.tool-pan{cursor:move}
+#stage.drag{cursor:grabbing}
+#world{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}
+.ground{
+  position:absolute;left:50%;top:50%;pointer-events:none;
+  -webkit-mask-image:radial-gradient(closest-side,#000 30%,transparent 96%);
+  mask-image:radial-gradient(closest-side,#000 30%,transparent 96%);
+}
+.shd{position:absolute;left:50%;top:50%;pointer-events:none;transition:transform .16s ease}
+.shd.is-drag{transition:none}
+.box{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;transition:transform .16s ease}
+.box.is-drag{transition:none}
+.face{position:absolute;left:50%;top:50%;backface-visibility:hidden;cursor:grab}
+.box.hover .face{filter:brightness(1.07)}
+.box.hover .lbl span{color:var(--accent)}
+.box.is-drag .face{cursor:grabbing;filter:brightness(1.12)}
+.lbl{
+  position:absolute;left:50%;top:50%;white-space:nowrap;pointer-events:none;
+  font-size:11px;font-weight:600;text-align:center;line-height:1.25;
+  text-shadow:0 1px 3px var(--bg),0 0 6px var(--bg),0 0 2px var(--bg);
+}
+.lbl em{display:block;font-style:normal;font-weight:450;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+#hud{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;pointer-events:none}
+#hud>*{pointer-events:auto}
+.grp{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.grp button{border:none;background:transparent;padding:5px 10px;font-size:11.5px;color:var(--muted)}
+.grp button+button{border-left:1px solid var(--line)}
+.grp button.on{background:var(--accent);color:#fff}
+.grp button:not(.on):hover{background:var(--sub);color:var(--ink)}
+#unit{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 8px;font-size:11.5px}
+.scale-note{font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-variant-numeric:tabular-nums}
+.pillbtn{font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+.pillbtn:hover{color:var(--ink);border-color:var(--accent)}
+#tip{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  font-size:11.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+  border-radius:20px;padding:5px 13px;pointer-events:none;
+}
+#tip.hide{display:none}
+
+/* ---------- table ---------- */
+#tablewrap{border-top:1px solid var(--line);background:var(--panel);max-height:37vh;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{
+  position:sticky;top:0;background:var(--panel);z-index:2;
+  font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;
+}
+th:first-child,td:first-child{text-align:left}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--sub)}
+tbody tr.base{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+tbody tr:last-child td{border-bottom:none}
+.tag{display:inline-flex;align-items:center;gap:6px}
+.tag i{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
+.basemark{font-size:9.5px;color:var(--accent);font-weight:650;letter-spacing:.03em}
+.dim-txt{color:var(--muted)}
+.tempty{padding:16px;color:var(--muted);font-size:12px}
+
+@media (max-width:820px){
+  #app{grid-template-columns:1fr;grid-template-rows:minmax(0,44vh) 1fr}
+  #panel{border-right:none;border-bottom:1px solid var(--line)}
+  #tablewrap{max-height:32vh}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <div class="brand">
+      <h1>박스 크기 비교</h1>
+      <p>가로·세로·높이를 넣고 같은 축척에서 비교</p>
+    </div>
+    <div class="sec">
+      <div class="sec-h"><b>내 박스</b></div>
+      <div id="list-box"></div>
+      <button class="btn" id="add-box">+ 박스 추가</button>
+    </div>
+    <div class="sec">
+      <div class="sec-h"><b>기준 물체</b></div>
+      <div id="list-ref"></div>
+      <select class="btn" id="preset"><option value="">+ 프리셋에서 추가…</option></select>
+      <button class="btn" id="add-ref">+ 직접 입력</button>
+    </div>
+    <div class="sec">
+      <div class="sec-h"><b>시점</b></div>
+      <div class="grp" style="width:100%" id="views">
+        <button data-rx="-22" data-ry="-32" style="flex:1">입체</button>
+        <button data-rx="0" data-ry="0" style="flex:1">정면</button>
+        <button data-rx="0" data-ry="-90" style="flex:1">측면</button>
+        <button data-rx="-82" data-ry="0" style="flex:1">위</button>
+      </div>
+      <div style="height:12px"></div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="stage">
+      <div id="world"></div>
+      <div id="tip">드래그로 회전 · 휠로 확대 · 더블클릭으로 초기화</div>
+      <div id="hud">
+        <div class="grp" id="modes">
+          <button data-mode="row">나란히</button>
+          <button data-mode="stack">겹쳐보기</button>
+        </div>
+        <div class="grp" id="camtool">
+          <button data-tool="pan" title="배경을 드래그하면 화면이 이동합니다">이동</button>
+          <button data-tool="orbit" title="배경을 드래그하면 화면이 회전합니다 (스페이스바를 누르고 있으면 잠시 이동으로 전환)">회전</button>
+        </div>
+        <select id="unit">
+          <option value="mm">mm</option>
+          <option value="cm">cm</option>
+          <option value="in">inch</option>
+        </select>
+        <button class="pillbtn" id="reset-pos" title="모든 박스를 자동 배치 위치로 되돌립니다">위치 초기화</button>
+        <button class="pillbtn" id="share-link" title="지금 상태 그대로 볼 수 있는 링크를 클립보드에 복사합니다">🔗 공유 링크</button>
+        <div class="scale-note" id="scale-note"></div>
+      </div>
+    </div>
+    <div id="tablewrap"><div id="table"></div></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* ============ 상수 ============ */
+const KEY = 'box-compare-v1';
+const UNITS = { mm:{f:1, dec:1, step:1}, cm:{f:10, dec:2, step:0.1}, in:{f:25.4, dec:3, step:0.05} };
+const UL    = { mm:'mm', cm:'cm', in:'in' };
+const COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#0ea5e9','#f97316','#84cc16','#a855f7'];
+
+/* 대략값 — 추가한 뒤 자유롭게 수정 가능 (가로 W × 세로 D × 높이 H, mm) */
+const PRESETS = [
+  ['신용카드',        85.6,  54,    0.8],
+  ['만원권 지폐',     148,   68,    0.1],
+  ['아이폰 (Pro급)',  71.5,  8.3,   149.6],
+  ['A4 용지',         210,   297,   0.1],
+  ['음료 캔 355ml',   66,    66,    123],
+  ['생수병 500ml',    65,    65,    210],
+  ['노트북 13인치',   304,   212,   16],
+  ['신발 상자',       330,   200,   120],
+  ['택배 1호 박스',   220,   190,   90],
+  ['사람 (170cm)',    450,   250,   1700],
+];
+
+/* ============ 상태 ============ */
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+let S = {
+  items: [{ id:uid(), name:'박스 A', w:300, d:200, h:150, color:COLORS[0], kind:'box', visible:true }],
+  unit: 'mm', mode: 'row', base: null,
+  view: { rx:-22, ry:-32, zoom:1, panX:0, panY:0, tool:'orbit' },
+};
+
+try {
+  const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (raw && Array.isArray(raw.items)) S = Object.assign(S, raw, { view: Object.assign(S.view, raw.view || {}) });
+} catch (e) { /* 손상된 저장값은 무시하고 기본값 사용 */ }
+
+/* ============ 공유 링크 (URL 해시에 데이터를 직접 담아 전달) ============ */
+function b64urlEncode(str) {
+  const bin = Array.from(new TextEncoder().encode(str), b => String.fromCharCode(b)).join('');
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlDecode(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+// 링크에 #d=... 가 있으면 그 데이터를 최우선으로 사용 (내 localStorage보다 우선 — 공유받은 내용을 봐야 하므로)
+(function loadFromHash() {
+  const m = location.hash.match(/#d=([^&]+)/);
+  if (!m) return;
+  try {
+    const p = JSON.parse(b64urlDecode(m[1]));
+    if (p && Array.isArray(p.items)) {
+      S.items = p.items;
+      if (p.unit) S.unit = p.unit;
+      if (p.mode) S.mode = p.mode;
+      if (p.base)  S.base = p.base;
+    }
+  } catch (e) { /* 손상된 링크는 무시하고 기존 상태 사용 */ }
+})();
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;left:-999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+let saveT = 0;
+function save() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 200);
+}
+
+/* ============ 단위 / 포맷 ============ */
+const U = () => UNITS[S.unit];
+const toMM   = v => v * U().f;
+const fromMM = v => v / U().f;
+
+function num(v, d) {
+  if (!isFinite(v)) return '—';
+  return (+v.toFixed(d)).toLocaleString('ko-KR', { maximumFractionDigits: d });
+}
+const len  = mm => num(fromMM(mm), U().dec) + ' ' + UL[S.unit];
+const lenN = mm => num(fromMM(mm), U().dec);
+
+function volTxt(mm3) {
+  if (S.unit === 'in') return num(mm3 / 16387.064, 2) + ' in³';
+  const cm3 = mm3 / 1000;
+  if (cm3 < 1)   return num(mm3, 1) + ' mm³';
+  if (cm3 < 1e3) return num(cm3, 1) + ' cm³';
+  if (cm3 < 1e6) return num(cm3 / 1e3, 2) + ' L';
+  return num(cm3 / 1e6, 3) + ' m³';
+}
+function areaTxt(mm2) {
+  if (S.unit === 'in') return num(mm2 / 645.16, 2) + ' in²';
+  if (mm2 < 1e2) return num(mm2, 1) + ' mm²';
+  if (mm2 < 1e6) return num(mm2 / 100, 1) + ' cm²';
+  return num(mm2 / 1e6, 3) + ' m²';
+}
+
+/* ============ 색 ============ */
+function shade(hex, f, a) {
+  const n = parseInt(hex.slice(1), 16);
+  const cl = v => Math.max(0, Math.min(255, Math.round(v)));
+  const r = cl(((n >> 16) & 255) * f), g = cl(((n >> 8) & 255) * f), b = cl((n & 255) * f);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+const nextColor = () => COLORS[S.items.length % COLORS.length];
+
+/* ============ DOM ============ */
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), world = $('#world');
+
+/* ============ 레이아웃 ============ */
+let placed = [], k = 1, spanY = 1, hSpan = 1, cellMM = 100;
+
+function layout() {
+  const vis = S.items.filter(i => i.visible && i.w > 0 && i.d > 0 && i.h > 0);
+  placed = [];
+  if (!vis.length) { k = 1; return; }
+
+  const maxW = Math.max(...vis.map(i => i.w));
+  const maxD = Math.max(...vis.map(i => i.d));
+  const maxH = Math.max(...vis.map(i => i.h));
+  let spanX, spanZ;
+
+  if (S.mode === 'row') {
+    const gap = maxW * 0.08;
+    const total = vis.reduce((s, i) => s + i.w, 0) + gap * (vis.length - 1);
+    let cur = -total / 2;
+    vis.forEach(i => { placed.push({ i, x: cur + i.w / 2, y: i.h / 2, z: 0 }); cur += i.w + gap; });
+    spanX = total; spanZ = maxD;
+  } else {
+    // 겹쳐보기: 뒤-왼쪽-아래 모서리를 공유
+    vis.forEach(i => placed.push({ i, x: -maxW / 2 + i.w / 2, y: i.h / 2, z: -maxD / 2 + i.d / 2 }));
+    spanX = maxW; spanZ = maxD;
+  }
+  // 사용자가 직접 끌어서 옮긴 위치(가로 방향만, 바닥 위 유지) 반영
+  // — 자동 배치 위치에 오프셋을 더하는 방식이라 개수/크기가 바뀌어도 "옮긴 만큼"은 그대로 유지된다.
+  placed.forEach(p => { p.x += (p.i.ox || 0); p.z += (p.i.oz || 0); });
+  spanY = maxH;
+
+  // 축척: 회전과 무관하게 고정 (박스 간 상대 크기가 절대 깨지지 않도록)
+  hSpan = Math.max(1, Math.hypot(spanX, spanZ));
+  const vSpan = Math.max(1, spanY + hSpan * 0.45);
+  const sw = Math.max(120, stage.clientWidth  - 40);
+  const sh = Math.max(120, stage.clientHeight - 90);
+  k = 0.82 * Math.min(sw / hSpan, sh / vSpan);
+
+  const NICE = [1,2,5,10,20,25,50,100,200,250,500,1000,2000,2500,5000,10000,20000];
+  cellMM = NICE.find(c => c * k >= 26) || NICE[NICE.length - 1];
+}
+
+/* ============ 3D 렌더 ============ */
+let boxEls = [], hintSeen = false;
+
+function updateTip() {
+  const t = $('#tip');
+  if (!placed.length) { t.textContent = '왼쪽에서 박스를 추가해 보세요'; t.classList.remove('hide'); }
+  else if (hintSeen)  { t.classList.add('hide'); }
+  else {
+    t.textContent = (S.view.tool === 'pan' ? '배경 드래그로 화면 이동' : '배경 드래그로 회전(스페이스+드래그: 이동)') + ' · 박스 드래그로 위치 이동 · 휠로 확대';
+    t.classList.remove('hide');
+  }
+}
+function seen() { if (!hintSeen) { hintSeen = true; updateTip(); } }
+
+function face(w, h, tf, bg, bd) {
+  const d = document.createElement('div');
+  d.className = 'face';
+  d.style.cssText = 'width:' + w + 'px;height:' + h + 'px;margin-left:' + (-w / 2) + 'px;margin-top:' + (-h / 2) +
+                    'px;background:' + bg + ';box-shadow:inset 0 0 0 1px ' + bd + ';transform:' + tf;
+  return d;
+}
+
+function renderScene() {
+  world.innerHTML = '';
+  boxEls = [];
+  lastOrder = '';                       // 요소를 새로 만들었으므로 정렬 캐시 무효화
+  $('#scale-note').textContent = placed.length ? '격자 1칸 = ' + len(cellMM) : '';
+  updateTip();
+  if (!placed.length) return;
+
+  const gy = spanY / 2 * k;               // 바닥면(y=0)의 CSS y 위치
+  const cell = cellMM * k;
+
+  // 바닥 그리드
+  const gsz = Math.max(400, hSpan * k * 2.6);
+  const g = document.createElement('div');
+  g.className = 'ground';
+  g.style.cssText = 'width:' + gsz + 'px;height:' + gsz + 'px;margin-left:' + (-gsz / 2) + 'px;margin-top:' + (-gsz / 2) +
+    'px;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);' +
+    'background-size:' + cell + 'px ' + cell + 'px;background-position:50% 50%;' +
+    'transform:translate3d(0,' + (gy + 1) + 'px,0) rotateX(90deg)';
+  world.appendChild(g);
+
+  // 접지 그림자 + 박스 (같은 순회에서 만들어 재배치 시 짝을 바로 찾을 수 있게 함)
+  const alpha = S.mode === 'stack' ? 0.36 : 1;
+  placed.forEach(p => {
+    const sw = Math.max(2, p.i.w * k) * 1.5, sd = Math.max(2, p.i.d * k) * 1.5;
+    const shd = document.createElement('div');
+    shd.className = 'shd';
+    shd.style.cssText = 'width:' + sw + 'px;height:' + sd + 'px;margin-left:' + (-sw / 2) + 'px;margin-top:' + (-sd / 2) +
+      'px;background:radial-gradient(ellipse at center,var(--shadow),transparent 70%);' +
+      'transform:translate3d(' + (p.x * k) + 'px,' + (gy + 0.5) + 'px,' + (p.z * k) + 'px) rotateX(90deg)';
+    world.appendChild(shd);
+
+    const W = Math.max(1, p.i.w * k), H = Math.max(1, p.i.h * k), D = Math.max(1, p.i.d * k);
+    const c = p.i.color, bd = shade(c, 0.45, Math.min(1, alpha + 0.45));
+    const el = document.createElement('div');
+    el.className = 'box';
+    el.dataset.id = p.i.id;
+    el.style.transform = 'translate3d(' + (p.x * k) + 'px,' + (gy - p.y * k) + 'px,' + (p.z * k) + 'px)';
+
+    el.appendChild(face(W, H, 'translateZ(' + (D / 2) + 'px)',                  shade(c, 1.00, alpha), bd));
+    el.appendChild(face(W, H, 'rotateY(180deg) translateZ(' + (D / 2) + 'px)',  shade(c, 0.94, alpha), bd));
+    el.appendChild(face(D, H, 'rotateY(90deg) translateZ(' + (W / 2) + 'px)',   shade(c, 0.78, alpha), bd));
+    el.appendChild(face(D, H, 'rotateY(-90deg) translateZ(' + (W / 2) + 'px)',  shade(c, 0.78, alpha), bd));
+    el.appendChild(face(W, D, 'rotateX(90deg) translateZ(' + (H / 2) + 'px)',   shade(c, 1.18, alpha), bd));
+    el.appendChild(face(W, D, 'rotateX(-90deg) translateZ(' + (H / 2) + 'px)',  shade(c, 0.58, alpha), bd));
+
+    const lb = document.createElement('div');
+    lb.className = 'lbl';
+    lb.innerHTML = '<span></span><em></em>';
+    lb.firstChild.textContent = p.i.name;
+    lb.lastChild.textContent = lenN(p.i.w) + ' × ' + lenN(p.i.d) + ' × ' + lenN(p.i.h) + ' ' + UL[S.unit];
+    el.appendChild(lb);
+
+    world.appendChild(el);
+    boxEls.push({ id: p.i.id, el, shd, lb, dy: -(H / 2) - 24, x: p.x * k, y: gy - p.y * k, z: p.z * k });
+  });
+}
+
+/* 치수는 그대로 두고 위치(오프셋)만 바뀌었을 때 — 전체를 다시 만들지 않고 좌표만 갱신 */
+function reposition() {
+  layout();
+  const gy = spanY / 2 * k;
+  placed.forEach(p => {
+    const b = boxEls.find(x => x.id === p.i.id);
+    if (!b) return;
+    const px = p.x * k, py = gy - p.y * k, pz = p.z * k;
+    b.el.style.transform  = 'translate3d(' + px + 'px,' + py + 'px,' + pz + 'px)';
+    b.shd.style.transform = 'translate3d(' + px + 'px,' + (gy + 0.5) + 'px,' + pz + 'px) rotateX(90deg)';
+    b.x = px; b.y = py; b.z = pz;
+  });
+  applyView();
+}
+
+/* 화면 픽셀 이동량 → 바닥면(XZ) 이동량(mm). 현재 시점 회전을 역으로 풀어 계산.
+   피치(rx)가 0에 가까우면(옆에서 수평으로 보는 시점) 앞뒤 이동이 화면상 구분되지 않아
+   수식이 불안정해지므로 최소값으로 고정해 다루기 쉬운 값을 유지한다. */
+function screenDeltaToGround(dsx, dsy) {
+  const kz = (k * S.view.zoom) || 1;
+  dsx /= kz; dsy /= kz;
+  const ry = S.view.ry * Math.PI / 180, rx = S.view.rx * Math.PI / 180;
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  let sx = Math.sin(rx);
+  if (Math.abs(sx) < 0.12) sx = sx < 0 ? -0.12 : 0.12;
+  const D = -sx;
+  const dX = (-cy * sx * dsx - sy * dsy) / D;
+  const dZ = (-sy * sx * dsx + cy * dsy) / D;
+  return { dX, dZ };
+}
+
+/* 회전에 따라서만 갱신되는 것들: 월드 변환 · 라벨 빌보드 · 앞뒤 정렬 */
+let lastOrder = '';
+function applyView() {
+  const { rx, ry, zoom, panX, panY } = S.view;
+  world.style.transform = 'translate3d(' + (panX || 0) + 'px,' + (panY || 0) + 'px,0) scale3d(' + zoom + ',' + zoom + ',' + zoom + ') rotateX(' + rx + 'deg) rotateY(' + ry + 'deg)';
+
+  const bill = ' rotateY(' + (-ry) + 'deg) rotateX(' + (-rx) + 'deg) translate(-50%,-50%)';
+  boxEls.forEach(b => { b.lb.style.transform = 'translate3d(0,' + b.dy + 'px,0)' + bill; });
+
+  // 화가 알고리즘: 카메라 공간 깊이 순으로 DOM 재배치 (먼 것부터)
+  const RX = rx * Math.PI / 180, RY = ry * Math.PI / 180;
+  const cx = Math.cos(RX), sx = Math.sin(RX), cy = Math.cos(RY), sy = Math.sin(RY);
+  const sorted = boxEls.map((b, n) => {
+    const z1 = -b.x * sy + b.z * cy;
+    return { b, n, d: b.y * sx + z1 * cx };
+  }).sort((p, q) => p.d - q.d);
+
+  const sig = sorted.map(o => o.n).join(',');
+  if (sig !== lastOrder) { lastOrder = sig; sorted.forEach(o => world.appendChild(o.b.el)); }
+}
+
+/* ============ 비교 표 ============ */
+function fitCount(outer, inner) {
+  const P = [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+  const O = [outer.w, outer.d, outer.h], I = [inner.w, inner.d, inner.h];
+  let best = 0;
+  P.forEach(p => {
+    const n = Math.floor(O[0] / I[p[0]]) * Math.floor(O[1] / I[p[1]]) * Math.floor(O[2] / I[p[2]]);
+    if (isFinite(n) && n > best) best = n;
+  });
+  return best;
+}
+
+function renderTable() {
+  const vis = S.items.filter(i => i.visible && i.w > 0 && i.d > 0 && i.h > 0);
+  const wrap = $('#table');
+  if (!vis.length) { wrap.innerHTML = '<div class="tempty">표시 중인 박스가 없습니다.</div>'; return; }
+
+  let base = vis.find(i => i.id === S.base) || vis[0];
+  const bv = base.w * base.d * base.h;
+  const u = UL[S.unit];
+
+  let html = '<table><thead><tr>' +
+    '<th>이름</th><th>가로 × 세로 × 높이</th><th>비율</th><th>부피</th><th>겉넓이</th>' +
+    '<th>바닥 면적</th><th>대각선</th><th>기준 대비</th><th>기준에 담기는 수</th>' +
+    '</tr></thead><tbody>';
+
+  vis.forEach(i => {
+    const v = i.w * i.d * i.h;
+    const m = Math.min(i.w, i.d, i.h);
+    const r = [i.w / m, i.d / m, i.h / m].map(x => (+x.toFixed(2)).toString()).join(' : ');
+    const isB = i.id === base.id;
+    html += '<tr class="' + (isB ? 'base' : '') + '" data-id="' + i.id + '">' +
+      '<td><span class="tag"><i style="background:' + i.color + '"></i>' + esc(i.name) +
+        (isB ? ' <span class="basemark">기준</span>' : '') + '</span></td>' +
+      '<td class="dim-txt">' + lenN(i.w) + ' × ' + lenN(i.d) + ' × ' + lenN(i.h) + ' ' + u + '</td>' +
+      '<td>' + r + '</td>' +
+      '<td>' + volTxt(v) + '</td>' +
+      '<td>' + areaTxt(2 * (i.w * i.d + i.d * i.h + i.h * i.w)) + '</td>' +
+      '<td>' + areaTxt(i.w * i.d) + '</td>' +
+      '<td>' + len(Math.hypot(i.w, i.d, i.h)) + '</td>' +
+      '<td>' + (isB ? '—' : '×' + num(v / bv, v / bv < 1 ? 3 : 2)) + '</td>' +
+      '<td>' + (isB ? '—' : num(fitCount(base, i), 0) + '개') + '</td>' +
+      '</tr>';
+  });
+  wrap.innerHTML = html + '</tbody></table>';
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+/* ============ 좌측 패널 ============ */
+function card(i) {
+  const st = U().step;
+  return '<div class="card ' + (i.visible ? '' : 'off') + '" data-id="' + i.id + '">' +
+    '<div class="card-t">' +
+      '<span class="sw" style="background:' + i.color + '"><input type="color" data-f="color" value="' + i.color + '"></span>' +
+      '<input class="nm" data-f="name" value="' + esc(i.name) + '">' +
+      '<button class="ico" data-a="pos" title="위치 초기화">⤾</button>' +
+      '<button class="ico" data-a="vis" title="표시/숨김">' + (i.visible ? '◉' : '○') + '</button>' +
+      '<button class="ico" data-a="del" title="삭제">✕</button>' +
+    '</div>' +
+    '<div class="dims">' +
+      ['w','d','h'].map((f, n) =>
+        '<label class="dim"><span>' + ['가로','세로','높이'][n] + '</span>' +
+        '<input type="number" min="0" step="' + st + '" data-f="' + f + '" value="' + lenN(i[f]).replace(/,/g, '') + '"></label>'
+      ).join('') +
+    '</div>' +
+    '<div class="rot">' +
+      '<button class="rotb" data-a="swap" data-pair="w,d" title="가로 ↔ 세로 (바닥에서 90° 회전)">가로⇄세로</button>' +
+      '<button class="rotb" data-a="swap" data-pair="d,h" title="세로 ↔ 높이 (앞뒤로 눕히기)">세로⇄높이</button>' +
+      '<button class="rotb" data-a="swap" data-pair="w,h" title="가로 ↔ 높이 (옆으로 눕히기)">가로⇄높이</button>' +
+    '</div></div>';
+}
+
+function renderPanel() {
+  const b = S.items.filter(i => i.kind === 'box'), r = S.items.filter(i => i.kind === 'ref');
+  $('#list-box').innerHTML = b.length ? b.map(card).join('') : '<div class="empty">박스를 추가해 보세요.</div>';
+  $('#list-ref').innerHTML = r.length ? r.map(card).join('') : '<div class="empty">익숙한 물건을 넣으면 크기 감이 잡혀요.</div>';
+  $('#unit').value = S.unit;
+  document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x.dataset.mode === S.mode));
+  syncToolBtns();
+}
+
+function syncToolBtns() {
+  document.querySelectorAll('#camtool button').forEach(x => x.classList.toggle('on', x.dataset.tool === S.view.tool));
+  stage.classList.toggle('tool-pan', S.view.tool === 'pan');
+}
+
+/* ============ 갱신 ============ */
+function sync()      { layout(); renderScene(); applyView(); renderTable(); save(); }
+function renderAll() { renderPanel(); sync(); }
+
+/* ============ 이벤트 ============ */
+function addItem(kind, o) {
+  S.items.push(Object.assign({ id:uid(), name: kind === 'box' ? '박스 ' + String.fromCharCode(65 + S.items.filter(i => i.kind === 'box').length) : '새 물체',
+    w:200, d:150, h:100, color:nextColor(), kind, visible:true }, o || {}));
+  renderAll();
+}
+
+$('#add-box').onclick = () => addItem('box');
+$('#add-ref').onclick = () => addItem('ref', { name:'새 물체', w:100, d:100, h:100 });
+
+const sel = $('#preset');
+PRESETS.forEach((p, n) => sel.insertAdjacentHTML('beforeend', '<option value="' + n + '">' + esc(p[0]) + '</option>'));
+sel.onchange = () => {
+  const p = PRESETS[+sel.value];
+  if (p) addItem('ref', { name:p[0], w:p[1], d:p[2], h:p[3] });
+  sel.value = '';
+};
+
+$('#panel').addEventListener('input', e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const it = S.items.find(i => i.id === card.dataset.id); if (!it) return;
+  const f = e.target.dataset.f;
+  if (f === 'name')       { it.name = e.target.value; }
+  else if (f === 'color') { it.color = e.target.value; card.querySelector('.sw').style.background = it.color; }
+  else if (f)             { it[f] = Math.max(0, toMM(parseFloat(e.target.value) || 0)); }
+  sync();
+});
+
+$('#panel').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-a]'); if (!btn) return;
+  const card = btn.closest('.card');
+  const n = S.items.findIndex(i => i.id === card.dataset.id); if (n < 0) return;
+  if (btn.dataset.a === 'del') { S.items.splice(n, 1); renderAll(); }
+  else if (btn.dataset.a === 'pos') { S.items[n].ox = 0; S.items[n].oz = 0; reposition(); renderTable(); save(); }
+  else if (btn.dataset.a === 'swap') {
+    const [fa, fb] = btn.dataset.pair.split(',');
+    const it = S.items[n], t = it[fa]; it[fa] = it[fb]; it[fb] = t;
+    renderAll();
+  }
+  else { S.items[n].visible = !S.items[n].visible; renderAll(); }
+});
+
+$('#reset-pos').onclick = () => {
+  S.items.forEach(i => { i.ox = 0; i.oz = 0; });
+  reposition(); renderTable(); save();
+};
+
+$('#share-link').onclick = () => {
+  const payload = { items: S.items, unit: S.unit, mode: S.mode, base: S.base };
+  const url = location.origin + location.pathname + '#d=' + b64urlEncode(JSON.stringify(payload));
+  copyText(url);
+  history.replaceState(null, '', '#d=' + url.split('#d=')[1]); // 지금 화면 주소도 최신 링크로 맞춰둠
+  const btn = $('#share-link'), orig = btn.textContent;
+  btn.textContent = '복사됨 ✓';
+  clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = orig; }, 1600);
+};
+
+$('#unit').onchange = e => { S.unit = e.target.value; renderAll(); };
+
+$('#modes').onclick = e => {
+  const b = e.target.closest('button[data-mode]'); if (!b) return;
+  S.mode = b.dataset.mode; renderPanel(); sync();
+};
+
+const clearViewBtns = () => document.querySelectorAll('#views button').forEach(x => x.classList.remove('on'));
+$('#views').onclick = e => {
+  const b = e.target.closest('button[data-rx]'); if (!b) return;
+  S.view.rx = +b.dataset.rx; S.view.ry = +b.dataset.ry; S.view.zoom = 1; S.view.panX = 0; S.view.panY = 0;
+  clearViewBtns(); b.classList.add('on');
+  applyView(); save();
+};
+
+$('#camtool').onclick = e => {
+  const b = e.target.closest('button[data-tool]'); if (!b) return;
+  S.view.tool = b.dataset.tool;
+  syncToolBtns(); updateTip(); save();
+};
+
+$('#table').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  S.base = tr.dataset.id; renderTable(); save();
+});
+
+/* 궤도 회전 · 줌 · 박스 드래그 이동 */
+let drag = null, itemDrag = null, spaceHeld = false, hoveredId = null;
+const effTool = () => spaceHeld ? 'pan' : S.view.tool;   // 스페이스바를 누르는 동안 일시적으로 이동 모드
+
+/* 클릭하기 전, 지금 커서 아래 있는 게 어느 박스인지 미리 강조해서 보여줌 */
+function setHover(id) {
+  if (id === hoveredId) return;
+  if (hoveredId) { const prev = boxEls.find(x => x.id === hoveredId); if (prev) prev.el.classList.remove('hover'); }
+  hoveredId = id;
+  if (id) { const cur = boxEls.find(x => x.id === id); if (cur) cur.el.classList.add('hover'); }
+}
+
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('#hud')) return;
+  seen();
+  const boxEl = e.target.closest('.box');
+  const item = boxEl && S.items.find(i => i.id === boxEl.dataset.id);
+  if (item) {
+    itemDrag = { item, sx:e.clientX, sy:e.clientY, ox:item.ox || 0, oz:item.oz || 0 };
+    boxEl.classList.add('is-drag');
+    const b = boxEls.find(x => x.id === item.id);
+    if (b) b.shd.classList.add('is-drag');   // 그림자도 같이 즉시-추종 모드로 (잔상 방지)
+    stage.setPointerCapture(e.pointerId);
+    return;
+  }
+  drag = { x:e.clientX, y:e.clientY };
+  if (effTool() === 'orbit') clearViewBtns();
+  stage.classList.add('drag'); stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (itemDrag) {
+    const { dX, dZ } = screenDeltaToGround(e.clientX - itemDrag.sx, e.clientY - itemDrag.sy);
+    itemDrag.item.ox = itemDrag.ox + dX;
+    itemDrag.item.oz = itemDrag.oz + dZ;
+    reposition();
+    return;
+  }
+  if (!drag) {
+    const boxEl = e.target.closest('.box');
+    setHover(boxEl ? boxEl.dataset.id : null);
+    return;
+  }
+  if (effTool() === 'pan') {
+    S.view.panX += (e.clientX - drag.x);
+    S.view.panY += (e.clientY - drag.y);
+  } else {
+    S.view.ry += (e.clientX - drag.x) * 0.35;
+    S.view.rx = Math.max(-85, Math.min(85, S.view.rx - (e.clientY - drag.y) * 0.35));
+  }
+  drag.x = e.clientX; drag.y = e.clientY;
+  applyView();
+});
+stage.addEventListener('pointerleave', () => setHover(null));
+
+/* 스페이스바를 누르고 있는 동안만 "이동" 모드로 전환 (입력창에 포커스가 있을 땐 무시) */
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || spaceHeld || e.repeat) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea' || e.target.isContentEditable) return;
+  spaceHeld = true;
+  e.preventDefault();
+  stage.classList.add('tool-pan');
+});
+addEventListener('keyup', e => {
+  if (e.code !== 'Space') return;
+  spaceHeld = false;
+  stage.classList.toggle('tool-pan', S.view.tool === 'pan');
+});
+addEventListener('blur', () => {
+  if (!spaceHeld) return;
+  spaceHeld = false;
+  stage.classList.toggle('tool-pan', S.view.tool === 'pan');
+});
+const endDrag = () => {
+  if (itemDrag) {
+    document.querySelectorAll('.is-drag').forEach(x => x.classList.remove('is-drag'));
+    itemDrag = null; renderTable(); save();
+    return;
+  }
+  if (drag) { drag = null; stage.classList.remove('drag'); save(); }
+};
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+
+stage.addEventListener('wheel', e => {
+  e.preventDefault(); seen();
+  S.view.zoom = Math.max(0.15, Math.min(8, S.view.zoom * Math.exp(-e.deltaY * 0.0015)));
+  applyView(); save();
+}, { passive:false });
+
+stage.addEventListener('dblclick', e => {
+  const boxEl = e.target.closest('.box');
+  const item = boxEl && S.items.find(i => i.id === boxEl.dataset.id);
+  if (item) { item.ox = 0; item.oz = 0; reposition(); renderTable(); save(); return; }
+  S.view = { rx:-22, ry:-32, zoom:1, panX:0, panY:0, tool:S.view.tool };
+  clearViewBtns(); document.querySelector('#views button').classList.add('on');
+  applyView(); save();
+});
+
+let rzT = 0;
+addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(sync, 120); });
+
+renderAll();
+</script>
+</body>
+</html>
